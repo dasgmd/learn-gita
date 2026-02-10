@@ -1,0 +1,7 @@
+{
+  "name": "LearnGita.com",
+  "description": "A modern, divine LMS for structured spiritual education based on the Bhagavad Gita, featuring AI-powered guidance and a personalized Sadhna tracker.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
