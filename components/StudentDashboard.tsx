@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Course, User, SadhnaRecord } from '../types';
+import { Course, User, SadhnaRecord, AppSection } from '../types';
 import CourseCard from './CourseCard';
 import LevelProgressBar from './LevelProgressBar';
 import { sadhnaService } from '../services/sadhnaService';
@@ -12,10 +12,11 @@ interface StudentDashboardProps {
   user: User;
   enrolledCourses: Course[];
   onViewCourse: (courseId: string) => void;
+  onNavigate?: (section: AppSection) => void;
   t: (key: string) => string;
 }
 
-const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCourses, onViewCourse, t }) => {
+const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCourses, onViewCourse, onNavigate, t }) => {
   const [selectedRecord, setSelectedRecord] = useState<SadhnaRecord | null>(null);
   const [upcomingFestivals, setUpcomingFestivals] = useState<Festival[]>([]);
 
@@ -74,7 +75,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCours
             </div>
           </div>
           <button
-            onClick={() => window.location.hash = '#vaishnava-hub'} // Or use navigation prop if passed
+            onClick={() => onNavigate?.(AppSection.VaishnavaHub)}
             className="bg-saffron text-white px-6 py-2 rounded-full font-bold text-sm hover:shadow-lg hover:scale-105 transition-all whitespace-nowrap"
           >
             View Seva

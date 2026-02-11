@@ -13,12 +13,18 @@ import { LEVEL_SYSTEM } from '../constants';
  * 6. Count consecutive days with gap === 1
  */
 /**
- * Extract just the date portion (yyyy-MM-dd) from any timestamp string.
- * Handles: "2026-02-10T14:30:00Z", "2026-02-10 14:30:00+00", "2026-02-10"
+ * Safely converts a timestamp to a local date string (YYYY-MM-DD).
+ * Use this for created_at (which is UTC in DB) to correctly reflect 
+ * the user's local day of submission.
  */
-function extractDateStr(timestamp: string): string {
-  // Split on T or space to handle both ISO and Postgres formats
-  return timestamp.split(/[T ]/)[0];
+function toLocalDateStr(timestamp: string | Date | null): string {
+  if (!timestamp) return "";
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  // Use local components to avoid UTC shifting
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /**
@@ -34,14 +40,11 @@ function extractDateStr(timestamp: string): string {
 function calculatePunctualStreak(
   logs: { entry_date: string; created_at: string | null }[]
 ): number {
-  console.log('\n=== STREAK CALCULATION START ===');
 
   // Step 1: Normalize Dates
   const now = new Date();
   const todayStr = format(now, 'yyyy-MM-dd');
   const yesterdayStr = format(subDays(now, 1), 'yyyy-MM-dd');
-
-  console.log('[Step 1] Today:', todayStr, '| Yesterday:', yesterdayStr);
 
   // Step 2 & 3: Define Punctuality and Filter
   // Step 2: A record is 'Punctual' if submission_date is SAME or DAY AFTER entry_date.
@@ -49,44 +52,37 @@ function calculatePunctualStreak(
   const punctualDates = new Set<string>();
 
   logs.forEach(log => {
-    const entryDateStr = extractDateStr(log.entry_date).trim();
+    // entry_date is already stored as YYYY-MM-DD string in DB
+    const entryDateStr = log.entry_date.trim();
 
-    // If no created_at, treat as punctual (legacy/migration case)
-    if (!log.created_at) {
-      punctualDates.add(entryDateStr);
+    // Convert UTC created_at to user's local YYYY-MM-DD
+    // Note: Supabase might return created_at or createdAt depending on mapping
+    const rawCreated = (log as any).created_at || (log as any).createdAt;
+
+    if (!rawCreated) {
       return;
     }
 
-    const submittedDateStr = extractDateStr(log.created_at).trim();
-
+    const submittedDateStr = toLocalDateStr(rawCreated);
     const entryDate = parseISO(entryDateStr);
     const submittedDate = parseISO(submittedDateStr);
-
-    // Normalize to start of day for accurate difference calculation
     const daysDiff = differenceInCalendarDays(submittedDate, entryDate);
 
-    // Punctual if submitted on SAME day (0) or NEXT day (1)
+    // Punctual if submitted on SAME day (0) or NEXT day (1) in local time
     if (daysDiff >= 0 && daysDiff <= 1) {
       punctualDates.add(entryDateStr);
-      console.log(`[Step 3] Log for ${entryDateStr} is PUNCTUAL (submitted on ${submittedDateStr}, diff: ${daysDiff})`);
-    } else {
-      console.log(`[Step 3] Log for ${entryDateStr} is LATE (submitted on ${submittedDateStr}, diff: ${daysDiff})`);
     }
   });
 
   const sortedPunctualDates = Array.from(punctualDates).sort((a, b) => b.localeCompare(a));
-  console.log('[Step 3] Total punctual entry dates:', sortedPunctualDates);
 
   // Step 4: Check for Today/Yesterday
   let currentSearchDateStr: string;
   if (punctualDates.has(todayStr)) {
-    console.log(`[Step 4] Chain starts from Today (${todayStr})`);
     currentSearchDateStr = todayStr;
   } else if (punctualDates.has(yesterdayStr)) {
-    console.log(`[Step 4] Chain starts from Yesterday (${yesterdayStr})`);
     currentSearchDateStr = yesterdayStr;
   } else {
-    console.log('[Step 4] No punctual log for Today or Yesterday. Streak = 0');
     return 0;
   }
 
@@ -100,23 +96,9 @@ function calculatePunctualStreak(
 
     if (punctualDates.has(checkDateStr)) {
       streak++;
-      console.log(`[Step 5] Found preceding punctual log for ${checkDateStr}. Streak: ${streak}`);
     } else {
-      console.log(`[Step 5] Missing punctual log for ${checkDateStr}. Chain breaks.`);
       break;
     }
-  }
-
-  console.log(`[Final Result] STREAK = ${streak}\n`);
-
-  // PERSISTENT DEBUG FOR AGENT
-  if (typeof window !== 'undefined') {
-    (window as any).STREAK_DEBUG = {
-      today: todayStr,
-      yesterday: yesterdayStr,
-      punctualDates: sortedPunctualDates,
-      streak
-    };
   }
 
   return streak;
@@ -152,8 +134,6 @@ export const sadhnaService = {
 
     if (logError) {
       console.error("Error fetching logs for streak:", logError);
-    } else if (logs && logs.length > 0) {
-      console.log("[DB DEBUG] Sample log row structure:", Object.keys(logs[0]));
     }
 
     // 3. Calculate the Punctual Chain

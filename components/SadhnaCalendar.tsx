@@ -44,16 +44,25 @@ const getDateStatus = (
     }
 
     // Has an entry — check timeliness
-    if (log.createdAt) {
+    const rawCreated = (log as any).createdAt || (log as any).created_at;
+    if (rawCreated) {
         const entryDate = parseISO(log.date);
-        const submittedDate = parseISO(log.createdAt.split('T')[0]);
+
+        // Convert UTC createdAt to user's local date string
+        const subDate = new Date(rawCreated);
+        const y = subDate.getFullYear();
+        const m = String(subDate.getMonth() + 1).padStart(2, '0');
+        const d = String(subDate.getDate()).padStart(2, '0');
+        const submittedDateStr = `${y}-${m}-${d}`;
+
+        const submittedDate = parseISO(submittedDateStr);
         const daysDiff = differenceInCalendarDays(submittedDate, entryDate);
 
-        if (daysDiff <= 1) return 'green';  // On-time (same day or next day)
+        if (daysDiff >= 0 && daysDiff <= 1) return 'green';  // On-time (same day or next day) in local time
         return 'orange';                     // Delayed (2+ days late)
     }
 
-    return 'green'; // If no created_at info, assume on-time
+    return 'orange'; // If no created_at info, treat as delayed
 };
 
 const statusStyles: Record<DateStatus, string> = {

@@ -32,21 +32,27 @@ const getDayStatus = (
     }
 
     // 3. Has entry - check punctuality
-    if (log.createdAt) {
-        const entryDate = parseISO(log.date);
-        const submittedDateStr = log.createdAt.split(/[T ]/)[0];
-        const submittedDate = parseISO(submittedDateStr);
-        const daysDiff = differenceInCalendarDays(submittedDate, entryDate);
+    const rawCreated = (log as any).createdAt || (log as any).created_at;
 
-        // Punctual: submitted on same day or next day
+    if (rawCreated) {
+        const entryDate = parseISO(log.date);
+
+        // Convert UTC createdAt to user's local date string
+        const subDate = new Date(rawCreated);
+        const y = subDate.getFullYear();
+        const m = String(subDate.getMonth() + 1).padStart(2, '0');
+        const d = String(subDate.getDate()).padStart(2, '0');
+        const submittedDateStr = `${y}-${m}-${d}`;
+
+        // Punctual: submitted on same day (0) or next day (1) in local time
         if (daysDiff >= 0 && daysDiff <= 1) return 'green';
 
         // Late: submitted more than 1 day after
         return 'orange';
     }
 
-    // No createdAt → assume green (benefit of the doubt for legacy)
-    return 'green';
+    // No createdAt → treat as orange (late) for past dates to be safe
+    return 'orange';
 };
 
 const statusColors: Record<DayStatus, { bg: string; text: string; ring: string }> = {

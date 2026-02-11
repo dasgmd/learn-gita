@@ -20,11 +20,10 @@ const DevoteeList: React.FC<DevoteeListProps> = ({ onSelectUser }) => {
         try {
             setLoading(true);
             const data = await adminService.getAllUsers();
-            // Map Supabase data to User interface if needed, or use as is
-            // Assuming data matches User interface roughly
             setUsers(data as any[]);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Failed to fetch users", err);
+            alert(`Failed to load devotees: ${err.message || err}`);
         } finally {
             setLoading(false);
         }
@@ -87,8 +86,7 @@ const DevoteeList: React.FC<DevoteeListProps> = ({ onSelectUser }) => {
                                     </div>
                                 </td>
                                 <td className="p-6 text-[#3D2B1F]/80">
-                                    {/* City logic to be added if available, checking profile data specifically */}
-                                    {(user as any).city || '-'}
+                                    {(user as any).city || 'Not Set'}
                                 </td>
                                 <td className="p-6 text-center">
                                     <div className="inline-flex items-center gap-1 font-bold text-[#FFB800]">
