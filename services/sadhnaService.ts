@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { SadhnaRecord } from '../types';
 import { parseISO, differenceInCalendarDays, format, subDays } from 'date-fns';
+import { LEVEL_SYSTEM } from '../constants';
 
 /**
  * Punctual Chain Algorithm:
@@ -20,77 +21,111 @@ function extractDateStr(timestamp: string): string {
   return timestamp.split(/[T ]/)[0];
 }
 
+/**
+ * Punctual Chain Algorithm - STRICT IMPLEMENTATION
+ * 
+ * Step 1: Gather all Sadhna logs from the database
+ * Step 2: Define 'Punctual': A log is 'Punctual' if (SubmissionDate - EntryDate) <= 1 day
+ * Step 3: Filter: Create a new list containing only the logs that are 'Punctual'
+ * Step 4: Sort: Sort this list of 'Punctual' logs by EntryDate in descending order (newest first)
+ * Step 5: Check Starting Point: If the EntryDate is NOT 'Today' or 'Yesterday', the Current Streak is 0
+ * Step 6: Count the Chain: Iterate through sorted list, count consecutive days (gap = 1), stop on first gap > 1
+ */
 function calculatePunctualStreak(
   logs: { entry_date: string; created_at: string | null }[]
 ): number {
-  const today = new Date();
-  const todayStr = format(today, 'yyyy-MM-dd');
-  const yesterdayStr = format(subDays(today, 1), 'yyyy-MM-dd');
+  console.log('\n=== STREAK CALCULATION START ===');
 
-  console.log('[Streak Debug] Today:', todayStr, '| Yesterday:', yesterdayStr);
-  console.log('[Streak Debug] Total logs:', logs.length);
+  // Step 1: Normalize Dates
+  const now = new Date();
+  const todayStr = format(now, 'yyyy-MM-dd');
+  const yesterdayStr = format(subDays(now, 1), 'yyyy-MM-dd');
 
-  // Step 2 & 3: Filter to only punctual entries
+  console.log('[Step 1] Today:', todayStr, '| Yesterday:', yesterdayStr);
+
+  // Step 2 & 3: Define Punctuality and Filter
+  // Step 2: A record is 'Punctual' if submission_date is SAME or DAY AFTER entry_date.
+  // Step 3: Filter the user's logs to find all 'Punctual' entries.
   const punctualDates = new Set<string>();
-  for (const log of logs) {
-    const entryDateStr = extractDateStr(log.entry_date);
 
-    // If created_at is missing, treat as punctual (benefit of the doubt)
+  logs.forEach(log => {
+    const entryDateStr = extractDateStr(log.entry_date).trim();
+
+    // If no created_at, treat as punctual (legacy/migration case)
     if (!log.created_at) {
-      console.log('[Streak Debug]', entryDateStr, '→ no created_at, treating as punctual');
       punctualDates.add(entryDateStr);
-      continue;
+      return;
     }
 
-    const submittedDateStr = extractDateStr(log.created_at);
-    const entryD = parseISO(entryDateStr);
-    const submittedD = parseISO(submittedDateStr);
-    const daysDiff = differenceInCalendarDays(submittedD, entryD);
+    const submittedDateStr = extractDateStr(log.created_at).trim();
 
-    console.log('[Streak Debug]', entryDateStr, '| submitted:', submittedDateStr, '| diff:', daysDiff, daysDiff <= 1 ? '✅ punctual' : '⚠️ late');
+    const entryDate = parseISO(entryDateStr);
+    const submittedDate = parseISO(submittedDateStr);
 
+    // Normalize to start of day for accurate difference calculation
+    const daysDiff = differenceInCalendarDays(submittedDate, entryDate);
+
+    // Punctual if submitted on SAME day (0) or NEXT day (1)
     if (daysDiff >= 0 && daysDiff <= 1) {
       punctualDates.add(entryDateStr);
-    }
-  }
-
-  // Step 4: Sort punctual dates descending
-  const sorted = Array.from(punctualDates).sort((a, b) =>
-    parseISO(b).getTime() - parseISO(a).getTime()
-  );
-
-  console.log('[Streak Debug] Punctual dates (sorted desc):', sorted);
-
-  if (sorted.length === 0) {
-    console.log('[Streak Debug] No punctual dates → streak = 0');
-    return 0;
-  }
-
-  // Step 5: Chain must start from today or yesterday
-  const mostRecent = sorted[0];
-  if (mostRecent !== todayStr && mostRecent !== yesterdayStr) {
-    console.log('[Streak Debug] Most recent', mostRecent, 'is not today/yesterday → streak = 0');
-    return 0;
-  }
-
-  // Step 6: Count the chain
-  let streak = 1;
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const gap = differenceInCalendarDays(parseISO(sorted[i]), parseISO(sorted[i + 1]));
-    if (gap === 1) {
-      streak++;
+      console.log(`[Step 3] Log for ${entryDateStr} is PUNCTUAL (submitted on ${submittedDateStr}, diff: ${daysDiff})`);
     } else {
+      console.log(`[Step 3] Log for ${entryDateStr} is LATE (submitted on ${submittedDateStr}, diff: ${daysDiff})`);
+    }
+  });
+
+  const sortedPunctualDates = Array.from(punctualDates).sort((a, b) => b.localeCompare(a));
+  console.log('[Step 3] Total punctual entry dates:', sortedPunctualDates);
+
+  // Step 4: Check for Today/Yesterday
+  let currentSearchDateStr: string;
+  if (punctualDates.has(todayStr)) {
+    console.log(`[Step 4] Chain starts from Today (${todayStr})`);
+    currentSearchDateStr = todayStr;
+  } else if (punctualDates.has(yesterdayStr)) {
+    console.log(`[Step 4] Chain starts from Yesterday (${yesterdayStr})`);
+    currentSearchDateStr = yesterdayStr;
+  } else {
+    console.log('[Step 4] No punctual log for Today or Yesterday. Streak = 0');
+    return 0;
+  }
+
+  // Step 5: The Chain Count
+  let streak = 1;
+  let checkDate = parseISO(currentSearchDateStr);
+
+  while (true) {
+    checkDate = subDays(checkDate, 1);
+    const checkDateStr = format(checkDate, 'yyyy-MM-dd');
+
+    if (punctualDates.has(checkDateStr)) {
+      streak++;
+      console.log(`[Step 5] Found preceding punctual log for ${checkDateStr}. Streak: ${streak}`);
+    } else {
+      console.log(`[Step 5] Missing punctual log for ${checkDateStr}. Chain breaks.`);
       break;
     }
   }
 
-  console.log('[Streak Debug] Final streak:', streak);
+  console.log(`[Final Result] STREAK = ${streak}\n`);
+
+  // PERSISTENT DEBUG FOR AGENT
+  if (typeof window !== 'undefined') {
+    (window as any).STREAK_DEBUG = {
+      today: todayStr,
+      yesterday: yesterdayStr,
+      punctualDates: sortedPunctualDates,
+      streak
+    };
+  }
+
   return streak;
 }
 
 export { calculatePunctualStreak };
 
 export const sadhnaService = {
+  calculatePunctualStreak, // Export the function on the object too
   async saveSadhna(userId: string, score: number, answers: any) {
     const entryDate = answers.date || format(new Date(), 'yyyy-MM-dd');
 
@@ -111,11 +146,15 @@ export const sadhnaService = {
     // 2. Fetch ALL logs
     const { data: logs, error: logError } = await supabase
       .from('sadhna_logs')
-      .select('entry_date, created_at')
+      .select('*') // Select all columns for debugging
       .eq('user_id', userId)
       .order('entry_date', { ascending: false });
 
-    if (logError) console.error("Error fetching logs for streak:", logError);
+    if (logError) {
+      console.error("Error fetching logs for streak:", logError);
+    } else if (logs && logs.length > 0) {
+      console.log("[DB DEBUG] Sample log row structure:", Object.keys(logs[0]));
+    }
 
     // 3. Calculate the Punctual Chain
     const currentStreak = calculatePunctualStreak(
@@ -200,5 +239,52 @@ export const sadhnaService = {
   async signOut() {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+  },
+
+  getCurrentLevelInfo(streak: number) {
+    let currentLevel = { id: 0, title: 'Novice', minStreak: 0 };
+    let nextLevel = LEVEL_SYSTEM[0];
+
+    for (let i = 0; i < LEVEL_SYSTEM.length; i++) {
+      if (streak >= LEVEL_SYSTEM[i].minStreak) {
+        currentLevel = LEVEL_SYSTEM[i];
+        nextLevel = LEVEL_SYSTEM[i + 1] || null;
+      } else {
+        nextLevel = LEVEL_SYSTEM[i];
+        break;
+      }
+    }
+
+    let progress = 0;
+    let daysRemaining = 0;
+
+    if (nextLevel) {
+      const range = nextLevel.minStreak - currentLevel.minStreak;
+      const currentProgress = streak - currentLevel.minStreak;
+      progress = Math.min(100, Math.max(0, (currentProgress / range) * 100));
+      daysRemaining = nextLevel.minStreak - streak;
+    } else {
+      progress = 100;
+      daysRemaining = 0;
+    }
+
+    return {
+      currentLevel,
+      nextLevel,
+      progress,
+      daysRemaining
+    };
+  },
+
+  checkLevelUp(oldStreak: number, newStreak: number) {
+    if (newStreak <= oldStreak) return null;
+
+    const newLevel = this.getCurrentLevelInfo(newStreak).currentLevel;
+    const oldLevel = this.getCurrentLevelInfo(oldStreak).currentLevel;
+
+    if (newLevel.id > oldLevel.id) {
+      return newLevel;
+    }
+    return null;
   }
 };

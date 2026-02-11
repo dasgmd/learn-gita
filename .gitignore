@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# IMPORTANT: .agent/ folder and project_context.md should be tracked
+# These files contain critical project documentation

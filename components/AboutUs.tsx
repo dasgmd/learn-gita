@@ -118,8 +118,8 @@ const AboutUs: React.FC<{ t: (key: string) => string }> = ({ t }) => {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id as any)}
                                         className={`px-6 py-2 rounded-full font-bold text-sm transition-all duration-300 border ${activeTab === tab.id
-                                                ? 'bg-saffron text-white border-saffron shadow-lg'
-                                                : 'bg-cream text-deepBrown border-saffron/20 hover:border-saffron'
+                                            ? 'bg-saffron text-white border-saffron shadow-lg'
+                                            : 'bg-cream text-deepBrown border-saffron/20 hover:border-saffron'
                                             }`}
                                     >
                                         {tab.label}

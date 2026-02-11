@@ -11,8 +11,15 @@ import CourseView from './components/CourseView';
 import AboutUs from './components/AboutUs';
 import SadhnaTracker from './components/SadhnaTracker';
 import ProfileSetup from './components/ProfileSetup';
+import LevelUpModal from './components/LevelUpModal';
+import VaishnavaHub from './components/VaishnavaHub';
+import AdminLogin from './components/admin/AdminLogin';
+import AdminLayout from './components/admin/AdminLayout';
+import DevoteeList from './components/admin/DevoteeList';
+import DevoteeDetail from './components/admin/DevoteeDetail';
+import FestivalManager from './components/admin/FestivalManager';
 import { AppSection, Language, User, Course, SadhnaRecord } from './types';
-import { COURSES } from './constants';
+import { COURSES, LEVEL_SYSTEM } from './constants';
 import { getVerseOfTheDay } from './services/geminiService';
 import { sadhnaService } from './services/sadhnaService';
 import { userService } from './services/userService';
@@ -64,7 +71,7 @@ const translations: Record<Language, Record<string, string>> = {
     btn_create_account: 'Create Account',
     auth_switch_signup: "New seeker? Join the path",
     auth_switch_login: "Already a member? Sign in",
-    welcome_back: 'Namaste',
+    welcome_back: 'Hare Krishna!',
     dashboard_subtitle: 'Here is an overview of your spiritual studies.',
     my_courses: 'My Enrolled Courses',
     stat_enrolled: 'Active Courses',
@@ -171,11 +178,15 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [levelUp, setLevelUp] = useState<any>(null);
 
   // App State
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<string[]>([]);
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
   const [completedLessonsMap, setCompletedLessonsMap] = useState<Record<string, string[]>>({});
+  // Admin State
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'users' | 'festivals'>('dashboard');
+  const [selectedAdminUser, setSelectedAdminUser] = useState<string | null>(null);
 
   const t = (key: string) => translations[language][key] || key;
 
@@ -207,13 +218,17 @@ const App: React.FC = () => {
         userService.fetchProfile(sbUser.id)
       ]);
 
+      const recalculatedStreak = sadhnaService.calculatePunctualStreak(
+        history.map(h => ({ entry_date: h.date, created_at: h.createdAt || null }))
+      );
+
       setUser({
         id: sbUser.id,
         name: profile?.name || sbUser.user_metadata?.full_name || 'Seeker',
         email: sbUser.email || '',
         sadhnaHistory: history,
-        currentStreak: profile?.current_streak || 0,
-        longestStreak: profile?.longest_streak || 0,
+        currentStreak: recalculatedStreak,
+        longestStreak: Math.max(recalculatedStreak, profile?.longest_streak || 0),
         lastSadhnaDate: profile?.last_sadhna_date
       });
     } catch (err) {
@@ -273,15 +288,24 @@ const App: React.FC = () => {
   const handleSadhnaComplete = async (score: number, report: any) => {
     if (!session || !user) return;
     try {
+      const oldStreak = user.currentStreak || 0;
       const result = await sadhnaService.saveSadhna(user.id, score, report);
+      const newStreak = result.newStreak;
+
       // Refresh user history
       const history = await sadhnaService.fetchHistory(user.id);
       setUser(prev => prev ? {
         ...prev,
         sadhnaHistory: history,
-        currentStreak: result.newStreak,
+        currentStreak: newStreak,
         longestStreak: result.newLongest
       } : null);
+
+      // Check for level up
+      const newLevel = sadhnaService.checkLevelUp(oldStreak, newStreak);
+      if (newLevel) {
+        setLevelUp(newLevel);
+      }
     } catch (err: any) {
       console.error("Failed to save sadhna", err);
       alert(t('save_error') || "Failed to save your sacred offering. Please check your database connection.");
@@ -337,6 +361,7 @@ const App: React.FC = () => {
           </button>
         </div>
       )}
+
 
       <main className="flex-grow">
         {activeSection === AppSection.Home && (
@@ -460,6 +485,7 @@ const App: React.FC = () => {
               user={user}
               enrolledCourses={enrolledCourses}
               onViewCourse={(id) => navigate(AppSection.CourseView, id)}
+              onNavigate={navigate}
               t={t}
             />
           </section>
@@ -496,6 +522,58 @@ const App: React.FC = () => {
             onComplete={() => navigate(AppSection.Dashboard)}
           />
         )}
+
+        {activeSection === AppSection.VaishnavaHub && user && (
+          <section className="py-20 px-6 min-h-screen bg-cream">
+            <VaishnavaHub user={user} />
+          </section>
+        )}
+
+        {activeSection === AppSection.AdminLogin && (
+          <AdminLogin onLoginSuccess={() => setActiveSection(AppSection.AdminDashboard)} />
+        )}
+
+        {activeSection === AppSection.AdminDashboard && (
+          <AdminLayout
+            activeTab={adminTab}
+            onTabChange={(tab) => { setAdminTab(tab); setSelectedAdminUser(null); }}
+            onLogout={() => {
+              supabase.auth.signOut();
+              setActiveSection(AppSection.Home);
+            }}
+          >
+            {adminTab === 'dashboard' && (
+              <div className="space-y-6">
+                <h1 className="font-serif text-3xl font-bold text-[#3D2B1F]">Welcome, Director</h1>
+                <p className="text-[#3D2B1F]/60">Select a module from the sidebar to begin managing the platform.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <button onClick={() => setAdminTab('users')} className="p-8 bg-white rounded-2xl border border-[#3D2B1F]/5 shadow-sm hover:shadow-md transition-all text-left group">
+                    <div className="w-12 h-12 bg-[#FFB800]/20 text-[#3D2B1F] rounded-full flex items-center justify-center mb-4 group-hover:bg-[#FFB800] transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                    </div>
+                    <h3 className="font-bold text-xl text-[#3D2B1F] mb-1">Manage Devotees</h3>
+                    <p className="text-sm text-[#3D2B1F]/60">View profiles, check streaks, and assign roles.</p>
+                  </button>
+                  <button onClick={() => setAdminTab('festivals')} className="p-8 bg-white rounded-2xl border border-[#3D2B1F]/5 shadow-sm hover:shadow-md transition-all text-left group">
+                    <div className="w-12 h-12 bg-[#FFB800]/20 text-[#3D2B1F] rounded-full flex items-center justify-center mb-4 group-hover:bg-[#FFB800] transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+                    </div>
+                    <h3 className="font-bold text-xl text-[#3D2B1F] mb-1">Push Festivals</h3>
+                    <p className="text-sm text-[#3D2B1F]/60">Create events and assign Seva tasks.</p>
+                  </button>
+                </div>
+              </div>
+            )}
+            {adminTab === 'users' && (
+              selectedAdminUser ? (
+                <DevoteeDetail userId={selectedAdminUser} onBack={() => setSelectedAdminUser(null)} />
+              ) : (
+                <DevoteeList onSelectUser={setSelectedAdminUser} />
+              )
+            )}
+            {adminTab === 'festivals' && <FestivalManager />}
+          </AdminLayout>
+        )}
       </main>
 
       <footer className="bg-deepBrown text-cream py-16 px-6 md:px-12 border-t-8 border-saffron">
@@ -518,6 +596,7 @@ const App: React.FC = () => {
             <h4 className="font-bold mb-6 text-saffron uppercase tracking-widest text-[10px]">{t('footer_resources')}</h4>
             <ul className="space-y-3 text-cream/70 text-xs font-bold uppercase tracking-widest">
               <li className="hover:text-saffron transition-colors cursor-pointer">Gita Library</li>
+              <li className="hover:text-saffron transition-colors cursor-pointer" onClick={() => navigate(AppSection.AdminLogin)}>Admin Portal</li>
             </ul>
           </div>
           <div>
@@ -529,6 +608,14 @@ const App: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {levelUp && (
+        <LevelUpModal
+          level={levelUp}
+          nextLevel={sadhnaService.getCurrentLevelInfo(user?.currentStreak || 0).nextLevel}
+          onClose={() => setLevelUp(null)}
+        />
+      )}
     </div>
   );
 };

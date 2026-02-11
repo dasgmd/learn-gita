@@ -17,6 +17,7 @@ export interface User {
   currentStreak?: number;
   longestStreak?: number;
   lastSadhnaDate?: string;
+  role?: 'user' | 'admin';
 }
 
 export interface Lesson {
@@ -67,5 +68,31 @@ export enum AppSection {
   Dashboard = 'dashboard',
   CourseView = 'course-view',
   About = 'about',
-  ProfileSetup = 'profile-setup'
+  ProfileSetup = 'profile-setup',
+  VaishnavaHub = 'vaishnava-hub',
+  AdminLogin = 'admin-login',
+  AdminDashboard = 'admin-dashboard'
+}
+
+export interface Festival {
+  id: string;
+  name: string;
+  date: string;
+  description: string;
+  significance: string;
+  fast_type: string;
+}
+
+export interface FestivalTask {
+  id: string;
+  festival_id: string;
+  task_description: string;
+  point_value: number;
+}
+
+export interface UserFestivalCompletion {
+  id: string;
+  user_id: string;
+  task_id: string;
+  completed_at: string;
 }

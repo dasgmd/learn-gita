@@ -12,6 +12,7 @@ interface SadhanaMiniStripProps {
     currentStreak: number;
     longestStreak: number;
     onDateSelect?: (date: string) => void;
+    t: (key: string) => string;
 }
 
 const getDayStatus = (
@@ -19,32 +20,33 @@ const getDayStatus = (
     logsMap: Map<string, SadhnaRecord>,
     today: Date
 ): DayStatus => {
-    const date = parseISO(dateStr);
+    const log = logsMap.get(dateStr);
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    // Today (if empty) or future → cream
-    if (dateStr === todayStr) {
-        const log = logsMap.get(dateStr);
-        if (!log) return 'cream';
+    // 1. Future dates → cream
+    if (dateStr > todayStr) return 'cream';
+
+    // 2. If no log exists (Today or Past) → Red
+    if (!log) {
+        return 'red';
     }
 
-    if (date > today) return 'cream';
-
-    const log = logsMap.get(dateStr);
-
-    if (!log) return 'red'; // Past date with no entry → missed
-
-    // Check punctuality via createdAt
+    // 3. Has entry - check punctuality
     if (log.createdAt) {
         const entryDate = parseISO(log.date);
-        const submittedDate = parseISO(log.createdAt.split('T')[0]);
+        const submittedDateStr = log.createdAt.split(/[T ]/)[0];
+        const submittedDate = parseISO(submittedDateStr);
         const daysDiff = differenceInCalendarDays(submittedDate, entryDate);
 
-        if (daysDiff <= 1) return 'green';  // On-time
-        return 'orange';                     // Late
+        // Punctual: submitted on same day or next day
+        if (daysDiff >= 0 && daysDiff <= 1) return 'green';
+
+        // Late: submitted more than 1 day after
+        return 'orange';
     }
 
-    return 'green'; // Fallback
+    // No createdAt → assume green (benefit of the doubt for legacy)
+    return 'green';
 };
 
 const statusColors: Record<DayStatus, { bg: string; text: string; ring: string }> = {
@@ -57,7 +59,7 @@ const statusColors: Record<DayStatus, { bg: string; text: string; ring: string }
 const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const SadhanaMiniStrip: React.FC<SadhanaMiniStripProps> = ({
-    logs, currentStreak, longestStreak, onDateSelect
+    logs, currentStreak, longestStreak, onDateSelect, t
 }) => {
     const [showCalendar, setShowCalendar] = useState(false);
     const today = useMemo(() => new Date(), []);
@@ -88,25 +90,32 @@ const SadhanaMiniStrip: React.FC<SadhanaMiniStripProps> = ({
 
                 {/* Streak Header */}
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-full ${currentStreak > 0 ? 'bg-orange-100 text-[#FFB800]' : 'bg-gray-100 text-gray-400'}`}>
-                            <Flame className={`w-5 h-5 ${currentStreak > 0 ? 'fill-current' : ''}`} />
+                    <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-2xl shadow-sm transition-all duration-500 ${currentStreak > 0 ? 'bg-orange-100 text-[#FFB800] scale-110' : 'bg-gray-100 text-gray-400'}`}>
+                            <Flame className={`w-8 h-8 ${currentStreak > 0 ? 'fill-current animate-pulse' : ''}`} />
                         </div>
                         <div>
-                            <h3 className="font-serif text-lg font-bold text-[#3D2B1F] leading-tight">
-                                {currentStreak > 0 ? `${currentStreak} Day Streak` : 'No Active Streak'}
-                            </h3>
-                            <p className="text-[10px] text-[#3D2B1F]/50 font-medium">
-                                Best: <span className="text-[#FFB800] font-bold">{longestStreak} days</span>
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-serif text-2xl font-black text-[#3D2B1F] leading-tight">
+                                    {currentStreak}
+                                </h3>
+                                <span className="text-sm font-bold text-[#3D2B1F]/60 uppercase tracking-widest">
+                                    {t('day_streak') || (currentStreak === 1 ? 'Day Streak' : 'Day Streak')}
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-[#3D2B1F]/50 font-medium mt-0.5">
+                                Best Effort: <span className="text-[#FFB800] font-bold">{longestStreak} days</span>
                                 {currentStreak > 0 && (
-                                    <span className="ml-2 text-green-500">● Disciplined</span>
+                                    <span className="ml-2 text-green-500 font-bold">● Disciplined</span>
                                 )}
                             </p>
                         </div>
                     </div>
-                    <span className="text-[10px] font-bold text-[#FFB800] uppercase tracking-widest bg-[#FFB800]/10 px-2.5 py-1 rounded-full">
-                        Lv {Math.floor(currentStreak / 7) + 1}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                        <span className="text-[10px] font-bold text-[#FFB800] uppercase tracking-widest bg-[#FFB800]/10 px-3 py-1 rounded-full border border-[#FFB800]/20">
+                            Lv {Math.floor(currentStreak / 7) + 1}
+                        </span>
+                    </div>
                 </div>
 
                 {/* 5-Day Strip */}

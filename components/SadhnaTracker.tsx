@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { Language, SadhnaRecord } from '../types';
 import SadhanaMiniStrip from './SadhanaMiniStrip';
+import LevelProgressBar from './LevelProgressBar';
+import { sadhnaService } from '../services/sadhnaService';
 
 interface Option {
   id: string;
@@ -185,7 +187,7 @@ const ConfirmationModal: React.FC<{ isOpen: boolean, streak: number, onConfirm: 
 const SadhnaTracker: React.FC<SadhnaTrackerProps> = ({ language, onComplete, t, devoteeName, currentStreak = 0, longestStreak = 0, logs = [] }) => {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD local
     name: devoteeName || ''
   });
   const [showConfirm, setShowConfirm] = useState(false);
@@ -231,7 +233,7 @@ const SadhnaTracker: React.FC<SadhnaTrackerProps> = ({ language, onComplete, t, 
   const resetTracker = () => {
     setStep(0);
     setAnswers({
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('en-CA'),
       name: ''
     });
     setIsSubmitted(false);
@@ -335,14 +337,22 @@ const SadhnaTracker: React.FC<SadhnaTrackerProps> = ({ language, onComplete, t, 
     );
   }
 
+  if (!currentQuestion) return null;
+
+  const levelInfo = sadhnaService.getCurrentLevelInfo(currentStreak);
+
   return (
     <div className="bg-white rounded-[2.5rem] p-8 md:p-12 divine-shadow border border-clay/20 max-w-2xl mx-auto space-y-12 min-h-[500px] flex flex-col justify-between animate-in fade-in duration-500">
+
+      {/* Level Progress */}
+      <LevelProgressBar levelInfo={levelInfo} />
 
       {/* Mini Streak Strip */}
       <SadhanaMiniStrip
         logs={logs}
         currentStreak={currentStreak}
         longestStreak={longestStreak}
+        t={t}
         onDateSelect={(date) => {
           setAnswers(prev => ({ ...prev, date }));
           setStep(0); // go to date step
@@ -470,6 +480,7 @@ const SadhnaTracker: React.FC<SadhnaTrackerProps> = ({ language, onComplete, t, 
         </div>
       </div>
     </div>
+
   );
 };
 
