@@ -140,5 +140,75 @@ export const adminService = {
             .eq('id', taskId);
 
         if (error) throw error;
+    },
+
+    /**
+     * Fetch all Sopanas (lessons) from the database.
+     */
+    async getSopanas() {
+        const { data, error } = await supabase
+            .from('sopanas')
+            .select('*')
+            .order('book_name', { ascending: true })
+            .order('book_order', { ascending: true });
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Update an existing Sopana.
+     */
+    async updateSopana(id: string, updates: any) {
+        const { data, error } = await supabase
+            .from('sopanas')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Delete a Sopana.
+     */
+    async deleteSopana(id: string) {
+        const { error } = await supabase
+            .from('sopanas')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    /**
+     * Delete all Sopanas associated with a specific book.
+     */
+    async deleteBook(bookName: string) {
+        const { error } = await supabase
+            .from('sopanas')
+            .delete()
+            .eq('book_name', bookName);
+
+        if (error) throw error;
+    },
+
+    /**
+     * Delete ALL Sopanas from the database.
+     * WARNING: This action is irreversible.
+     */
+    async deleteAllSopanas() {
+        // We use not-eq to 0-0-0-0 as a hack to delete all rows since supabase delete requires a filter
+        // Or we can just use id is not null if we had a filter for that, but RLS usually handles 'true'
+        // For safety/easiness, we'll iterate or use a broad filter.
+        // A better approach for "delete all" in Supabase client is:
+        const { error } = await supabase
+            .from('sopanas')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Assuming valid UUIDs are not all zeros
+
+        if (error) throw error;
     }
 };

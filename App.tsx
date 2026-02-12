@@ -18,6 +18,8 @@ import AdminLayout from './components/admin/AdminLayout';
 import DevoteeList from './components/admin/DevoteeList';
 import DevoteeDetail from './components/admin/DevoteeDetail';
 import FestivalManager from './components/admin/FestivalManager';
+import CourseFactory from './components/admin/CourseFactory';
+import SopanaManager from './components/admin/SopanaManager';
 import { AppSection, Language, User, Course, SadhnaRecord } from './types';
 import { COURSES, LEVEL_SYSTEM } from './constants';
 import { getVerseOfTheDay } from './services/geminiService';
@@ -185,7 +187,7 @@ const App: React.FC = () => {
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
   const [completedLessonsMap, setCompletedLessonsMap] = useState<Record<string, string[]>>({});
   // Admin State
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'users' | 'festivals'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'users' | 'festivals' | 'factory'>('dashboard');
   const [selectedAdminUser, setSelectedAdminUser] = useState<string | null>(null);
 
   const t = (key: string) => translations[language][key] || key;
@@ -248,15 +250,65 @@ const App: React.FC = () => {
     fetchVotd();
   }, [language]);
 
-  const navigate = (section: AppSection, courseId?: string) => {
+  const navigate = (section: AppSection, courseId?: string, replace = false) => {
     if (section === AppSection.CourseView && courseId) {
       setActiveCourseId(courseId);
       setActiveSection(AppSection.CourseView);
     } else {
       setActiveSection(section);
     }
+
+    const state = { section, courseId };
+    const url = section === AppSection.Home ? '/' : `/${section}${courseId ? `/${courseId}` : ''}`;
+
+    if (replace) {
+      window.history.replaceState(state, '', url);
+    } else {
+      window.history.pushState(state, '', url);
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Sync state with browser history
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state) {
+        const { section, courseId } = event.state;
+        if (section === AppSection.CourseView && courseId) {
+          setActiveCourseId(courseId);
+          setActiveSection(AppSection.CourseView);
+        } else {
+          setActiveSection(section);
+        }
+      } else {
+        // Handle initial load or empty state
+        setActiveSection(AppSection.Home);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    // Initial sync for current URL
+    const path = window.location.pathname.slice(1);
+    if (path) {
+      const parts = path.split('/');
+      const section = parts[0] as AppSection;
+      const id = parts[1];
+      if (Object.values(AppSection).includes(section)) {
+        if (section === AppSection.CourseView && id) {
+          setActiveCourseId(id);
+          setActiveSection(AppSection.CourseView);
+        } else {
+          setActiveSection(section);
+        }
+        // Replace current state so we have it for future popstate
+        window.history.replaceState({ section, courseId: id }, '', window.location.pathname);
+      }
+    }
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const handleLogout = async () => {
     await sadhnaService.signOut();
@@ -530,7 +582,7 @@ const App: React.FC = () => {
         )}
 
         {activeSection === AppSection.AdminLogin && (
-          <AdminLogin onLoginSuccess={() => setActiveSection(AppSection.AdminDashboard)} />
+          <AdminLogin onLoginSuccess={() => navigate(AppSection.AdminDashboard)} />
         )}
 
         {activeSection === AppSection.AdminDashboard && (
@@ -572,6 +624,8 @@ const App: React.FC = () => {
               )
             )}
             {adminTab === 'festivals' && <FestivalManager />}
+            {adminTab === 'factory' && <CourseFactory />}
+            {adminTab === 'archive' && <SopanaManager />}
           </AdminLayout>
         )}
       </main>

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Users, Calendar, LogOut, LayoutDashboard } from 'lucide-react';
+import { Users, Calendar, LogOut, LayoutDashboard, Sparkles, BookOpen } from 'lucide-react';
 
 interface AdminLayoutProps {
     children: React.ReactNode;
-    activeTab: 'dashboard' | 'users' | 'festivals';
-    onTabChange: (tab: 'dashboard' | 'users' | 'festivals') => void;
+    activeTab: 'dashboard' | 'users' | 'festivals' | 'factory' | 'archive';
+    onTabChange: (tab: 'dashboard' | 'users' | 'festivals' | 'factory' | 'archive') => void;
     onLogout: () => void;
 }
 
@@ -29,8 +29,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabCha
                     <button
                         onClick={() => onTabChange('dashboard')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard'
-                                ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
-                                : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
+                            ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
+                            : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
                             }`}
                     >
                         <LayoutDashboard size={20} />
@@ -40,8 +40,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabCha
                     <button
                         onClick={() => onTabChange('users')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'users'
-                                ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
-                                : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
+                            ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
+                            : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
                             }`}
                     >
                         <Users size={20} />
@@ -51,12 +51,34 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabCha
                     <button
                         onClick={() => onTabChange('festivals')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'festivals'
-                                ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
-                                : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
+                            ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
+                            : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
                             }`}
                     >
                         <Calendar size={20} />
                         <span>Festivals</span>
+                    </button>
+
+                    <button
+                        onClick={() => onTabChange('factory')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'factory'
+                            ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
+                            : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
+                            }`}
+                    >
+                        <Sparkles size={20} />
+                        <span>Course Factory</span>
+                    </button>
+
+                    <button
+                        onClick={() => onTabChange('archive')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'archive'
+                            ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
+                            : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
+                            }`}
+                    >
+                        <BookOpen size={20} />
+                        <span>Sopana Archive</span>
                     </button>
                 </nav>
 

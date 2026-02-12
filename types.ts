@@ -96,3 +96,20 @@ export interface UserFestivalCompletion {
   task_id: string;
   completed_at: string;
 }
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+}
+
+export interface Sopana {
+  id?: string;
+  book_name?: string;
+  book_order?: number;
+  title: string;
+  reading_text: string;
+  revision_notes: string[];
+  quiz: QuizQuestion[];
+  created_at?: string;
+}
