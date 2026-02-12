@@ -20,11 +20,13 @@ import DevoteeDetail from './components/admin/DevoteeDetail';
 import FestivalManager from './components/admin/FestivalManager';
 import CourseFactory from './components/admin/CourseFactory';
 import SopanaManager from './components/admin/SopanaManager';
+import StudentProgressView from './components/admin/StudentProgress';
 import { AppSection, Language, User, Course, SadhnaRecord } from './types';
 import { COURSES, LEVEL_SYSTEM } from './constants';
 import { getVerseOfTheDay } from './services/geminiService';
 import { sadhnaService } from './services/sadhnaService';
 import { userService } from './services/userService';
+import { courseService } from './services/courseService';
 import { supabase } from './supabaseClient';
 
 const translations: Record<Language, Record<string, string>> = {
@@ -81,6 +83,7 @@ const translations: Record<Language, Record<string, string>> = {
     no_courses_yet: 'You haven\'t embarked on a course yet.',
     btn_browse_catalog: 'Browse the Knowledge Catalog',
     btn_enroll_now: 'Enroll Now',
+    view_lessons: 'View Lessons',
     btn_enrolled: 'Already Enrolled',
     course_progress: 'Mastery',
     sadhna_history: 'Report History',
@@ -151,6 +154,7 @@ const translations: Record<Language, Record<string, string>> = {
     no_courses_yet: 'आपने अभी तक कोई पाठ्यक्रम शुरू नहीं किया है।',
     btn_browse_catalog: 'ज्ञान कैटलॉग ब्राउज़ करें',
     btn_enroll_now: 'अभी नामांकन करें',
+    view_lessons: 'पाठ देखें',
     btn_enrolled: 'नामांकित',
     course_progress: 'निपुणता',
     sadhna_history: 'रिपोर्ट इतिहास',
@@ -186,34 +190,69 @@ const App: React.FC = () => {
   const [enrolledCourseIds, setEnrolledCourseIds] = useState<string[]>([]);
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
   const [completedLessonsMap, setCompletedLessonsMap] = useState<Record<string, string[]>>({});
+  const [dbCourses, setDbCourses] = useState<Course[]>([]);
   // Admin State
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'users' | 'festivals' | 'factory'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'users' | 'festivals' | 'factory' | 'archive' | 'progress'>('dashboard');
   const [selectedAdminUser, setSelectedAdminUser] = useState<string | null>(null);
 
-  const t = (key: string) => translations[language][key] || key;
+  // Merge static + DB courses (deduplicate by slug)
+  const allCourses: Course[] = React.useMemo(() => {
+    const staticSlugs = new Set(COURSES.map(c => c.slug));
+    const uniqueDbCourses = dbCourses.filter(c => !staticSlugs.has(c.slug));
+    return [...COURSES, ...uniqueDbCourses];
+  }, [dbCourses]);
+
+
+  const t = React.useCallback((key: string) => translations[language][key] || key, [language]);
 
   // 1. Initial Session Check
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchUserData(session.user);
-      else setLoadingUser(false);
-    });
+    let mounted = true;
+    let authSubscription: any = null;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) fetchUserData(session.user);
-      else {
-        setUser(null);
+    async function initializeSession() {
+      // Get initial session
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (initialSession) {
+        setSession(initialSession);
+        await fetchUserData(initialSession.user);
+      } else {
+        setSession(null);
         setLoadingUser(false);
       }
-    });
 
-    return () => subscription.unsubscribe();
+      // ONLY set up the listener after the initial check is handled
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!mounted) return;
+
+        // Skip the INITIAL_SESSION event to avoid double-fetching
+        if (event === 'INITIAL_SESSION') return;
+
+        setSession(session);
+        if (session) {
+          await fetchUserData(session.user);
+        } else {
+          setUser(null);
+          setLoadingUser(false);
+        }
+      });
+      authSubscription = subscription;
+    }
+
+    initializeSession();
+
+    return () => {
+      mounted = false;
+      if (authSubscription) authSubscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserData = async (sbUser: any) => {
-    setLoadingUser(true);
+    // Only show full-screen loader if we don't have a user yet
+    if (!user) setLoadingUser(true);
+
     try {
       const [history, profile] = await Promise.all([
         sadhnaService.fetchHistory(sbUser.id),
@@ -236,7 +275,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.error("Failed to fetch user data", err);
     } finally {
-      setLoadingUser(false);
+      if (!user) setLoadingUser(false);
     }
   };
 
@@ -250,7 +289,20 @@ const App: React.FC = () => {
     fetchVotd();
   }, [language]);
 
-  const navigate = (section: AppSection, courseId?: string, replace = false) => {
+  // Fetch courses from DB
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const courses = await courseService.getAllCourses();
+        setDbCourses(courses);
+      } catch (err) {
+        console.error('Failed to fetch courses from DB', err);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  const navigate = React.useCallback((section: AppSection, courseId?: string, replace = false) => {
     if (section === AppSection.CourseView && courseId) {
       setActiveCourseId(courseId);
       setActiveSection(AppSection.CourseView);
@@ -268,7 +320,7 @@ const App: React.FC = () => {
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
   // Sync state with browser history
   useEffect(() => {
@@ -310,34 +362,12 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = React.useCallback(async () => {
     await sadhnaService.signOut();
     navigate(AppSection.Home);
-  };
+  }, [navigate]);
 
-  const handleEnroll = (courseId: string) => {
-    if (!session) {
-      navigate(AppSection.Auth);
-      return;
-    }
-    if (!enrolledCourseIds.includes(courseId)) {
-      setEnrolledCourseIds(prev => [...prev, courseId]);
-    }
-  };
-
-
-
-  const handleMarkLessonComplete = (courseId: string, lessonId: string) => {
-    setCompletedLessonsMap(prev => {
-      const current = prev[courseId] || [];
-      if (!current.includes(lessonId)) {
-        return { ...prev, [courseId]: [...current, lessonId] };
-      }
-      return prev;
-    });
-  };
-
-  const handleSadhnaComplete = async (score: number, report: any) => {
+  const handleSadhnaComplete = React.useCallback(async (score: number, report: any) => {
     if (!session || !user) return;
     try {
       const oldStreak = user.currentStreak || 0;
@@ -362,22 +392,59 @@ const App: React.FC = () => {
       console.error("Failed to save sadhna", err);
       alert(t('save_error') || "Failed to save your sacred offering. Please check your database connection.");
     }
-  };
+  }, [session, user, t]);
 
-  const activeCourse = COURSES.find(c => c.id === activeCourseId);
-
-  const enrolledCourses: Course[] = COURSES
-    .filter(c => enrolledCourseIds.includes(c.id))
-    .map(c => {
-      const completed = completedLessonsMap[c.id] || [];
-      const total = c.lessons?.length || 1;
-      return {
-        ...c,
-        progress: Math.round((completed.length / total) * 100)
-      };
+  const handleEnroll = React.useCallback((courseId: string) => {
+    if (!session) {
+      navigate(AppSection.Auth);
+      return;
+    }
+    setEnrolledCourseIds(prev => {
+      if (prev.includes(courseId)) return prev;
+      return [...prev, courseId];
     });
+  }, [session, navigate]);
 
-  if (loadingUser) {
+
+
+  const handleViewCourse = React.useCallback((id: string) => {
+    navigate(AppSection.CourseView, id);
+  }, [navigate]);
+
+  const activeCourse = React.useMemo(() =>
+    allCourses.find(c => c.id === activeCourseId),
+    [allCourses, activeCourseId]
+  );
+
+
+
+  const handleMarkLessonComplete = React.useCallback((courseId: string, lessonId: string) => {
+    setCompletedLessonsMap(prev => {
+      const current = prev[courseId] || [];
+      if (!current.includes(lessonId)) {
+        return { ...prev, [courseId]: [...current, lessonId] };
+      }
+      return prev;
+    });
+  }, []);
+
+
+
+  const enrolledCourses: Course[] = React.useMemo(() => {
+    return allCourses
+      .filter(c => enrolledCourseIds.includes(c.id))
+      .map(c => {
+        const completed = completedLessonsMap[c.id] || [];
+        const total = c.lessons?.length || 1;
+        return {
+          ...c,
+          progress: Math.round((completed.length / total) * 100)
+        };
+      });
+  }, [allCourses, enrolledCourseIds, completedLessonsMap]);
+
+  // Only show the global loader for the initial mount and auth check
+  if (loadingUser && !user) {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -485,7 +552,7 @@ const App: React.FC = () => {
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {COURSES.map(course => (
+                  {allCourses.map(course => (
                     <CourseCard
                       key={course.id}
                       course={course}
@@ -504,7 +571,7 @@ const App: React.FC = () => {
           <section className="py-20 px-6 max-w-7xl mx-auto">
             <h1 className="font-serif text-5xl font-bold text-deepBrown mb-12 text-center">{t('explore_title')}</h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {COURSES.map(course => (
+              {allCourses.map(course => (
                 <CourseCard
                   key={course.id}
                   course={course}
@@ -536,7 +603,7 @@ const App: React.FC = () => {
             <StudentDashboard
               user={user}
               enrolledCourses={enrolledCourses}
-              onViewCourse={(id) => navigate(AppSection.CourseView, id)}
+              onViewCourse={handleViewCourse}
               onNavigate={navigate}
               t={t}
             />
@@ -550,6 +617,7 @@ const App: React.FC = () => {
             onMarkComplete={(lessonId) => handleMarkLessonComplete(activeCourse.id, lessonId)}
             completedLessons={completedLessonsMap[activeCourse.id] || []}
             t={t}
+            onNavigate={navigate}
           />
         )}
 
@@ -626,6 +694,7 @@ const App: React.FC = () => {
             {adminTab === 'festivals' && <FestivalManager />}
             {adminTab === 'factory' && <CourseFactory />}
             {adminTab === 'archive' && <SopanaManager />}
+            {adminTab === 'progress' && <StudentProgressView />}
           </AdminLayout>
         )}
       </main>

@@ -5,11 +5,12 @@ import { Course, SadhnaItem } from './types';
 export const COURSES: Course[] = [
   {
     id: 'gita-101',
+    slug: 'gita-essentials',
     title: 'Gita Essentials',
     description: 'A foundational journey through the 18 chapters of the Bhagavad Gita.',
     level: 'Beginner',
     duration: '8 Weeks',
-    image: 'https://picsum.photos/seed/gita1/800/600',
+    cover_image: 'https://picsum.photos/seed/gita1/800/600',
     lessons: [
       {
         id: 'l1',
@@ -41,11 +42,12 @@ export const COURSES: Course[] = [
   },
   {
     id: 'karma-yoga',
+    slug: 'karma-yoga',
     title: 'The Art of Karma Yoga',
     description: 'Learn how to transform daily work into a spiritual offering.',
     level: 'Intermediate',
     duration: '4 Weeks',
-    image: 'https://picsum.photos/seed/gita2/800/600',
+    cover_image: 'https://picsum.photos/seed/gita2/800/600',
     lessons: [
       {
         id: 'k1',
@@ -59,11 +61,12 @@ export const COURSES: Course[] = [
   },
   {
     id: 'bhakti-wisdom',
+    slug: 'bhakti-wisdom',
     title: 'Path of Devotion',
     description: 'Deep dive into the middle six chapters focusing on Bhakti Yoga.',
     level: 'Advanced',
     duration: '12 Weeks',
-    image: 'https://picsum.photos/seed/gita3/800/600',
+    cover_image: 'https://picsum.photos/seed/gita3/800/600',
     lessons: [
       {
         id: 'b1',

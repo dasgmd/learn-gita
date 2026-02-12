@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { Sopana, QuizQuestion } from '../../types';
 import { generateCourseFromPDF, verifyCourseCoverage } from '../../services/geminiService';
@@ -24,6 +24,84 @@ const CourseFactory: React.FC = () => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
+        }
+    };
+
+    // --- Draft Management ---
+    useEffect(() => {
+        checkAndLoadDraft();
+    }, []);
+
+    const checkAndLoadDraft = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('sopana_drafts')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (data) {
+                const confirmed = window.confirm(`Found a saved draft for "${data.book_name || 'Untitled'}". Would you like to restore it?`);
+                if (confirmed) {
+                    setSopanas(data.sopanas);
+                    setBookName(data.book_name || '');
+                    setUploadedFileUrl(data.file_url);
+                    // Use a placeholder file object or just text to indicate source
+                    // setFile(new File([], data.book_name || 'Draft Restored')); 
+                    setSaveSuccess(true);
+                    setTimeout(() => setSaveSuccess(false), 3000);
+                } else {
+                    // Optional: delete draft if user rejects? keeping it safe for now.
+                }
+            }
+        } catch (err) {
+            // ignore error if no draft found (PGRST116 is expected for .single())
+        }
+    };
+
+    const saveDraft = async (generatedComponents: Sopana[], sourceUrl: string, bName: string) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                console.error("No authenticated user found while saving draft!");
+                alert("Please log in to save drafts.");
+                return;
+            }
+            console.log("Saving draft for user:", user.id);
+
+            // First delete any existing drafts for this user to keep it clean (single draft mode)
+            await supabase.from('sopana_drafts').delete().eq('user_id', user.id);
+
+            const { error } = await supabase.from('sopana_drafts').insert({
+                user_id: user.id,
+                book_name: bName,
+                file_url: sourceUrl,
+                sopanas: generatedComponents
+            });
+
+            if (error) {
+                console.error('Supabase Draft Insert Error:', error);
+                throw error;
+            }
+            console.log('Draft saved successfully', { bName, count: generatedComponents.length });
+        } catch (err) {
+            console.error('Failed to save draft:', err);
+            alert('Warning: Failed to save draft. Your progress may be lost if you refresh.');
+        }
+    };
+
+    const deleteDraft = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            await supabase.from('sopana_drafts').delete().eq('user_id', user.id);
+        } catch (err) {
+            console.error('Failed to delete draft:', err);
         }
     };
 
@@ -61,7 +139,12 @@ const CourseFactory: React.FC = () => {
             });
 
             setSopanas(generatedSopanas);
-            setProgressStatus('Generation complete!');
+
+            // 3. Save Draft Immediately
+            const bName = bookName || file.name.replace('.pdf', '');
+            await saveDraft(generatedSopanas, publicUrl, bName);
+
+            setProgressStatus('Generation complete! Draft saved.');
         } catch (error: any) {
             console.error('Generation failed:', error);
             alert(`Error: ${error.message || 'Failed to generate course'}`);
@@ -99,6 +182,10 @@ const CourseFactory: React.FC = () => {
 
             console.log('Save successful:', data);
             setSaveSuccess(true);
+
+            // Cleanup Draft
+            await deleteDraft();
+
             setSopanas([]);
             setFile(null);
 
@@ -124,6 +211,9 @@ const CourseFactory: React.FC = () => {
             setSopanas(newSopanas);
             setEditingIndex(null);
             setEditSopana(null);
+
+            // Update draft with edits
+            saveDraft(newSopanas, uploadedFileUrl || '', bookName);
         }
     };
 
@@ -131,6 +221,8 @@ const CourseFactory: React.FC = () => {
         const newSopanas = sopanas.filter((_, i) => i !== index);
         setSopanas(newSopanas);
         setDeletingIndex(null);
+        // Update draft with removal
+        saveDraft(newSopanas, uploadedFileUrl || '', bookName);
     };
 
     const handleVerifyCoverage = async () => {

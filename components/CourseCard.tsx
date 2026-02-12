@@ -14,9 +14,9 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll, isEnrolled, s
   return (
     <div className="bg-white rounded-3xl overflow-hidden border border-clay/20 divine-shadow hover:-translate-y-1 transition-all group flex flex-col h-full">
       <div className="relative h-48 overflow-hidden">
-        <img 
-          src={course.image} 
-          alt={course.title} 
+        <img
+          src={course.cover_image}
+          alt={course.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold text-saffron uppercase tracking-widest shadow-sm">
@@ -39,8 +39,8 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll, isEnrolled, s
               <span>{course.progress}%</span>
             </div>
             <div className="w-full h-1.5 bg-cream rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-saffron transition-all duration-1000" 
+              <div
+                className="h-full bg-saffron transition-all duration-1000"
                 style={{ width: `${course.progress}%` }}
               />
             </div>
@@ -49,14 +49,14 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll, isEnrolled, s
 
         <div className="mt-auto pt-4">
           {isEnrolled ? (
-            <button 
+            <button
               onClick={() => onEnroll && onEnroll(course.id)}
               className="w-full bg-cream text-deepBrown border border-clay/20 py-2.5 rounded-xl font-bold text-sm hover:bg-clay/10 transition-all shadow-sm active:scale-95"
             >
               {t('view_lessons') || 'View Lessons'}
             </button>
           ) : (
-            <button 
+            <button
               onClick={() => onEnroll && onEnroll(course.id)}
               className="w-full bg-deepBrown text-cream py-2.5 rounded-xl font-bold text-sm hover:bg-saffron transition-all shadow-md active:scale-95"
             >
@@ -69,4 +69,4 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEnroll, isEnrolled, s
   );
 };
 
-export default CourseCard;
+export default React.memo(CourseCard);

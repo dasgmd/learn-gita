@@ -95,4 +95,4 @@ const LevelProgressBar: React.FC<LevelProgressBarProps> = ({ levelInfo }) => {
     );
 };
 
-export default LevelProgressBar;
+export default React.memo(LevelProgressBar);

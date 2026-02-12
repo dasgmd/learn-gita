@@ -120,27 +120,31 @@ export const generateCourseFromPDF = async (fileUrl: string, onProgress?: (statu
     const prompt = `You are a Senior Vedic Educator. Your task is to convert this ENTIRE book into a comprehensive course of "Sopanas" (Lessons).
     
     CRITICAL INSTRUCTIONS:
-    1. **COMPLETE COVERAGE REQUIRED**: You must cover EVERY chapter, EVERY section, and EVERY key philosophical concept in the book. Do NOT summarize or skip parts. If the book is long, generate as many Sopanas as needed (e.g., 20, 30, 50+) to cover everything.
-    2. **NO SUMMARIZATION**: Do not just give a "gist". The reading text for each Sopana must be detailed and capture the full depth of the author's arguments.
-    3. **SPECIFIC CONCEPTS**: Ensure you catch distinct philosophical categories (e.g., Thakura Bhaktivinoda's classification of legitimate vs. illegitimate persons, levels of eligible workers, etc.). Do not merge distinct concepts into generic "moral lessons".
+    1. **COMPLETE COVERAGE REQUIRED**: You must cover EVERY chapter, EVERY section, and EVERY key philosophical concept in the book. Do NOT summarize or skip parts.
+    2. **NO SUMMARIZATION**: Do not just give a "gist". The reading text for each Sopana must be detailed.
+    3. **SPECIFIC CONCEPTS**: Ensure you catch distinct philosophical categories.
     4. **STRUCTURE**:
-       - **Title**: Specific and descriptive (e.g., "The Two Classes of Humanity: Legitimate vs. Illegitimate").
-       - **Reading Text**: A substantive, well-structured explanation of that specific section (approx. 300-500 words).
-       - **Revision Notes**: 5-7 distinct bullet points that summarize the key logic of that specific section.
-       - **Quiz**: 3-5 questions that test understanding of the *specific* details in this Sopana.
+       - **Title**: Specific and descriptive.
+       - **Reading Text**: A substantive, well-structured explanation (approx. 300-500 words).
+       - **Revision Notes**: 5-7 distinct bullet points.
+       - **Quiz**: 3-5 questions.
 
-    Return ONLY a valid JSON array.
-    JSON Structure per Sopana:
+    Return ONLY a valid JSON object with a "lessons" key containing the array of Sopanas.
+    JSON Structure:
     {
-      "title": "Specific Topic Title",
-      "reading_text": "Detailed explanation of the text section...",
-      "revision_notes": ["Point 1", "Point 2", "Point 3", ...],
-      "quiz": [
+      "lessons": [
         {
-          "question": "Specific question about this section",
-          "options": ["Option A", "Option B", "Option C", "Option D"],
-          "correctAnswer": 0,
-          "explanation": "Why this is correct based on the text",
+          "title": "Specific Topic Title",
+          "reading_text": "Detailed explanation...",
+          "revision_notes": ["Point 1", ...],
+          "quiz": [
+            {
+              "question": "Specific question",
+              "options": ["A", "B", "C", "D"],
+              "correctAnswer": 0,
+              "explanation": "..."
+            }
+          ]
         }
       ]
     }`;
@@ -163,7 +167,44 @@ export const generateCourseFromPDF = async (fileUrl: string, onProgress?: (statu
       ],
       config: {
         temperature: 0.4,
-        responseMimeType: "application/json"
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            lessons: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  reading_text: { type: Type.STRING },
+                  revision_notes: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  quiz: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        question: { type: Type.STRING },
+                        options: {
+                          type: Type.ARRAY,
+                          items: { type: Type.STRING },
+                        },
+                        correctAnswer: { type: Type.NUMBER },
+                        explanation: { type: Type.STRING },
+                      },
+                      required: ["question", "options", "correctAnswer", "explanation"],
+                    },
+                  },
+                },
+                required: ["title", "reading_text", "revision_notes", "quiz"],
+              },
+            },
+          },
+          required: ["lessons"],
+        },
       }
     });
 
@@ -176,15 +217,20 @@ export const generateCourseFromPDF = async (fileUrl: string, onProgress?: (statu
       throw new Error("AI returned an empty response. Please try again.");
     }
 
+    // Log the raw text for debugging
+    console.log("Raw AI Response:", text);
+
     try {
-      return JSON.parse(text);
+      const cleanText = text.replace(/```json\n?|\n?```/g, '').trim();
+      const parsed = JSON.parse(cleanText);
+      // Handle both wrapped and unwrapped cases just in case
+      return Array.isArray(parsed) ? parsed : (parsed.lessons || []);
     } catch (parseError) {
       console.error("Failed to parse JSON from Gemini:", text);
       throw new Error("Failed to parse generated course. The AI response was not valid JSON.");
     }
   } catch (error: any) {
     console.error("Course Generation Error:", error);
-    // Log specialized error info if available
     if (error.response) console.error("API error details:", error.response);
     throw error;
   }

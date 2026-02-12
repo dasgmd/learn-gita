@@ -38,12 +38,29 @@ export interface Lesson {
 export interface Course {
   id: string;
   title: string;
-  description: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  duration: string;
-  image: string;
-  progress?: number;
-  lessons?: Lesson[];
+  slug: string;
+  description?: string;
+  level?: 'Beginner' | 'Intermediate' | 'Advanced' | string;
+  duration?: string;
+  cover_image?: string;
+  lessons?: Lesson[]; // kept for backward compatibility if needed, but we use Sopana now
+  progress?: number; // calculated at runtime
+}
+
+export interface Enrollment {
+  id: string;
+  user_id: string;
+  course_id: string;
+  enrolled_at: string;
+}
+
+export interface UserSopanaProgress {
+  id: string;
+  user_id: string;
+  sopana_id: string;
+  status: 'locked' | 'unlocked' | 'completed';
+  score: number;
+  completed_at?: string;
 }
 
 export interface SadhnaItem {
@@ -96,6 +113,7 @@ export interface UserFestivalCompletion {
   task_id: string;
   completed_at: string;
 }
+
 export interface QuizQuestion {
   question: string;
   options: string[];

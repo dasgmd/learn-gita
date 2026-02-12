@@ -7,6 +7,7 @@ import { festivalService } from '../services/festivalService';
 import { Festival } from '../types';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { Bell, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface StudentDashboardProps {
   user: User;
@@ -24,11 +25,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCours
     const fetchFestivals = async () => {
       try {
         const allFestivals = await festivalService.getUpcomingFestivals(5);
-        // "Events occurring in the next 48 hours" or specifically "exactly 2 days away"
-        // The prompt says: "If a festival is exactly 2 days away... 2-Day Nudge"
-        // It also says: "checkUpcomingEvents(festivals) that filters events occurring in the next 48 hours to trigger the notification."
-        // Let's use the helper from service or just inline logic.
-        // We'll filter for visual display in the banner.
         setUpcomingFestivals(allFestivals);
       } catch (err) {
         console.error("Failed to fetch festivals", err);
@@ -41,7 +37,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCours
   const nudgeFestival = nearFestivals.find(f => {
     const days = differenceInCalendarDays(parseISO(f.date), new Date());
     return days === 2;
-  }) || nearFestivals[0]; // Fallback to any near event for the banner if we want to show it within 48h too
+  }) || nearFestivals[0];
 
   const formatAnswerKey = (key: string) => {
     return key
@@ -53,10 +49,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCours
       .join(' ');
   };
 
-  const levelInfo = sadhnaService.getCurrentLevelInfo(user.currentStreak || 0);
+  const levelInfo = React.useMemo(() =>
+    sadhnaService.getCurrentLevelInfo(user.currentStreak || 0),
+    [user.currentStreak]
+  );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="max-w-7xl mx-auto space-y-12"
+    >
 
       {/* 2-Day Nudge Banner */}
       {nudgeFestival && differenceInCalendarDays(parseISO(nudgeFestival.date), new Date()) <= 2 && (
@@ -180,7 +184,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCours
                 onClick={() => setSelectedRecord(null)}
                 className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                <svg xmlns="http://www.w3.org/2000/center/24 24" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -234,8 +238,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, enrolledCours
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 
-export default StudentDashboard;
+export default React.memo(StudentDashboard);

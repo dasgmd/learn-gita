@@ -3,8 +3,8 @@ import { Users, Calendar, LogOut, LayoutDashboard, Sparkles, BookOpen } from 'lu
 
 interface AdminLayoutProps {
     children: React.ReactNode;
-    activeTab: 'dashboard' | 'users' | 'festivals' | 'factory' | 'archive';
-    onTabChange: (tab: 'dashboard' | 'users' | 'festivals' | 'factory' | 'archive') => void;
+    activeTab: 'dashboard' | 'users' | 'festivals' | 'factory' | 'archive' | 'progress';
+    onTabChange: (tab: 'dashboard' | 'users' | 'festivals' | 'factory' | 'archive' | 'progress') => void;
     onLogout: () => void;
 }
 
@@ -79,6 +79,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, activeTab, onTabCha
                     >
                         <BookOpen size={20} />
                         <span>Sopana Archive</span>
+                    </button>
+
+                    <button
+                        onClick={() => onTabChange('progress')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'progress'
+                            ? 'bg-[#FFB800] text-[#3D2B1F] font-bold'
+                            : 'text-[#FFFDF0]/70 hover:bg-[#FFFDF0]/5 hover:text-[#FFFDF0]'
+                            }`}
+                    >
+                        <Users size={20} />
+                        <span>Student Progress</span>
                     </button>
                 </nav>
 
